@@ -11,5 +11,5 @@ drew-radio-debug: main.cpp
 	g++ -g -o ./out/drew-radio main.cpp -lbluetooth -std=c++17
 
 clean:
-	rm -f ./out
+	rm -rf ./out
 	mkdir ./out

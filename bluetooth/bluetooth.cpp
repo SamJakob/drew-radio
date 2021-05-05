@@ -1,59 +1,71 @@
+#include <cstdlib>
+#include <unistd.h>
+
 #include <bluetooth/bluetooth.h>
 #include <bluetooth/hci.h>
 #include <bluetooth/hci_lib.h>
 
-#include <vector>
+#include "../exceptions.hpp"
+#include "bluetooth.hpp"
 
-#ifndef DR_BLUETOOTH
-#define DR_BLUETOOTH
+using namespace DrewRadio;
 
-namespace DrewRadio {
+int Bluetooth::scanForDevices() {
 
-    class Bluetooth {
+    // Get device and socket ID.
+    int searchDuration = 2;			 // Search Time = 1.28 * searchLength seconds.
+    int maxResponseCount = 255;
 
-        public:
-            inline static vector<BluetoothDevice> devices;
-            inline static int devicesCount;
+    // Get the first available device ID (NULL => first available)
+    int adaptorDeviceId = hci_get_route(NULL);
+    if (adaptorDeviceId < 0) throw DrewRadio::InterfaceNotFoundException();
 
-            static int scanForDevices() {
-                
-                // Get device and socket ID.
-                int len = 8, maxResponse = 255;
-                int dev_id = hci_get_route(NULL);
-                int sock = hci_open_dev(dev_id);
+    // Allocate memory to store the bluetooth inquiry results.
+    inquiry_info* ii = (inquiry_info*) malloc(maxResponseCount * sizeof(inquiry_info));
 
-                // Perform a bluetooth inquiry and collect the number of responses.
-                inquiry_info* ii = (inquiry_info*) malloc(maxResponse * sizeof(inquiry_info));
-                int numberOfResponses = hci_inquiry(dev_id, len, maxResponse, NULL, &ii, IREQ_CACHE_FLUSH);
-                
-                char addr[19] = { 0 };
-                char name[248] = { 0 };
-                for (int i = 0; i < numberOfResponses; i++) {
-                    // Convert the MAC address to a string and save it in addr.
-                    ba2str(&(ii+i)->bdaddr, addr);
-                    // Save the name to a string.
-                    memset(name, 0, sizeof(name));
+    // Perform a bluetooth inquiry and collect the number of responses.
+    int numberOfResponses = hci_inquiry(
+        adaptorDeviceId,				        // The local bluetooth device ID to scan with.
+        searchDuration,			    // The length of time to search for.
+        maxResponseCount,		    // The maximum number of devices to search for.
+        NULL,
+        &ii,				        // The memory location to return the results.
+        IREQ_CACHE_FLUSH		    // Flush the cache of previously discovered devices.
+    );
 
-                    // If the name is invalid, set the name to "Unknown Device".
-                    if (hci_read_remote_name(sock, &(ii+i)->bdaddr, sizeof(name), name, 0) < 0) {
-                        strcpy(name, "Unknown Device");
-                    }
+    // Open a socket to the bluetooth adaptor and start reading device information.
+    int socket = hci_open_dev(adaptorDeviceId);
+    if (socket < 0) throw DrewRadio::InterfaceFailureException();
 
-                    // Finally copy the data into a BluetoothDevice struct.
-                    BluetoothDevice device = BluetoothDevice();
-                    strncpy(device.address, addr, 19);
-                    strncpy(device.name, name, 248);
+    for (int i = 0; i < numberOfResponses; i++) {
+        // Allocate a BluetoothDevice struct for the device.
+        BluetoothDevice device = BluetoothDevice();
 
-                    devices.push_back(device);
-                }
+        // And copy the inquiry info into it.
+        inquiry_info* currentDevice = ii + i;
 
-                Bluetooth::devicesCount = numberOfResponses;
-                return numberOfResponses;
+        {
+            // Copy the hex device address.
+            ba2str(&currentDevice->bdaddr, device.address);
 
+            // Copy the device name.
+            if (hci_read_remote_name(socket, &currentDevice->bdaddr, sizeof(device.name), device.name, 0) < 0) {
+                // Make the device name a 'nullish' value, so we can tell the difference between a device whose name
+                // is set to UNKNOWN_BLUETOOTH_DEVICE_NAME and a device with an actually unknown name.
+                strcpy(device.name, "\0");
             }
+        }
 
-    };
+        devices.push_back(device);
+
+    }
+
+    // Clean up.
+    close(socket);
+    free(ii);
+
+    // Return the detected data.
+    Bluetooth::devicesCount = numberOfResponses;
+    return numberOfResponses;
 
 }
-
-#endif
