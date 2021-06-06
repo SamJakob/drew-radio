@@ -1,4 +1,5 @@
 #include <cstdint>
+#include <fstream>
 
 #include "../bluetooth/device.hpp"
 
@@ -65,7 +66,7 @@ namespace DrewRadio {
              *
              * This is intended to read only data saved by the SavedDevice::save function.
              */
-            void load(ifstream& inputStream);
+            static SavedDevice* load(ifstream& inputStream);
 
     };
 

@@ -27,6 +27,12 @@ namespace DrewRadio {
          * (which is "Unknown Device" by default).
          */
         char name[255];
+
+        /**
+         * The class of the bluetooth device, as reported by
+         * hci_read_class_of_dev.
+         */
+        uint8_t deviceClass[3];
     };
 
 }

@@ -23,6 +23,16 @@ namespace DrewRadio {
         public: virtual const char* what() const noexcept;
     };
 
+    /**
+     * Thrown when an invalid character or character sequence was identified whilst reading
+     * the program data from the file.
+     * Typically expected to be thrown, for example, if a magic number was incorrect because
+     * the file was corrupted or saved in the wrong format.
+     */
+    class FileFormatException : public std::exception {
+        public: virtual const char* what() const noexcept;
+    };
+
 
 }
 
